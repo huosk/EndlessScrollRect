@@ -37,9 +37,6 @@ public class BetterScrollView : LayoutGroup
     private LinkedList<Element> m_Elements;
 
     [SerializeField]
-    private int m_Index;
-
-    [SerializeField]
     private RectTransform m_View;
 
     private RectTransform m_Content;
@@ -86,6 +83,42 @@ public class BetterScrollView : LayoutGroup
         }
     }
 
+    public int ObjectCount
+    {
+        get
+        {
+            return m_ObjectCount;
+        }
+        set
+        {
+            m_ObjectCount = value;
+        }
+    }
+
+    public GameObject ElementPrefab
+    {
+        get
+        {
+            return m_ElementPrefab;
+        }
+        set
+        {
+            m_ElementPrefab = value;
+        }
+    }
+
+    public int index
+    {
+        get
+        {
+            return CalcuteCurrentIndex();
+        }
+        set
+        {
+            SetCurrentIndex(value);
+        }
+    }
+
     public override void CalculateLayoutInputHorizontal()
     {
         base.CalculateLayoutInputHorizontal();
@@ -102,6 +135,86 @@ public class BetterScrollView : LayoutGroup
 
     public override void SetLayoutVertical()
     {
+    }
+
+    public int CalcuteCurrentIndex()
+    {
+        if (m_Elements == null || m_Elements.Count == 0)
+        {
+            return 0;
+        }
+
+        var curNode = m_Elements.First;
+        Element lastEle = null;
+        float distance_ = float.MaxValue;
+
+        if (m_Direction == Direction.Horizontal)
+        {
+            float checkborder = View.TransformPoint(View.rect.min).x;
+            while (curNode != null)
+            {
+                float eleWorldCenterX = curNode.Value.transform.TransformPoint(curNode.Value.transform.rect.center).x;
+                var dis = Mathf.Abs(eleWorldCenterX - checkborder);
+                if (dis > distance_)
+                {
+                    break;
+                }
+                distance_ = dis;
+                lastEle = curNode.Value;
+                curNode = curNode.Next;
+            }
+            return lastEle.index;
+        }
+        else
+        {
+            while (curNode != null)
+            {
+                float checkborder = View.TransformPoint(View.rect.max).y;
+                float eleWorldCenterY = curNode.Value.transform.TransformPoint(curNode.Value.transform.rect.center).y;
+                var dis = Mathf.Abs(checkborder - eleWorldCenterY);
+                if (dis > distance_)
+                {
+                    break;
+                }
+                distance_ = dis;
+                lastEle = curNode.Value;
+                curNode = curNode.Next;
+            }
+            return lastEle.index;
+        }
+    }
+
+    public bool SetCurrentIndex(int index)
+    {
+        if(index <0 || index >= m_ObjectCount)
+        {
+            throw (new System.IndexOutOfRangeException());
+        }
+
+        if(m_Elements == null || m_Elements.Count==0)
+        {
+            return false;
+        }
+
+        if(m_Direction == Direction.Horizontal)
+        {
+            float offsetX = m_Padding.left + (m_CellSize.x + m_Spacing.x) * index;
+            float maxOffsetX = Content.rect.width - View.rect.width;
+            offsetX = offsetX > maxOffsetX ? maxOffsetX : offsetX;
+            Vector3 newPosition = Content.localPosition;
+            newPosition.x = offsetX;
+            Content.localPosition = newPosition;
+        }
+        else
+        {
+            float offsetY = m_Padding.top + (m_CellSize.y + m_Spacing.y) * index;
+            float maxOffsetY = Content.rect.height - View.rect.height;
+            offsetY = offsetY > maxOffsetY ? maxOffsetY : offsetY;
+            Vector3 newPosition = Content.localPosition;
+            newPosition.y = offsetY;
+            Content.localPosition = newPosition;
+        }
+        return true;
     }
 
     private bool IsElementShouldMoveUp(RectTransform t)
@@ -127,8 +240,8 @@ public class BetterScrollView : LayoutGroup
     private int CalculateElementsCount()
     {
         Vector2 viewSize = View.rect.size;
-        int index = m_Direction == Direction.Horizontal ? 0 : 1;
-        return Mathf.CeilToInt(viewSize[index] / m_CellSize[index]) + 2;
+        int index_ = m_Direction == Direction.Horizontal ? 0 : 1;
+        return Mathf.CeilToInt(viewSize[index_] / m_CellSize[index_]) + 2;
     }
 
     private void CreateElements()
@@ -146,15 +259,16 @@ public class BetterScrollView : LayoutGroup
         if (m_Direction == Direction.Vertical)
         {
             float contentHeight = (m_CellSize.y + m_Spacing.y) * m_ObjectCount + m_Padding.vertical;
+            Content.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, m_CellSize.x + m_Padding.horizontal);
             Content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
         }
         else
         {
             float contentWidth = (m_CellSize.x + m_Spacing.x) * m_ObjectCount + m_Padding.horizontal;
             Content.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, contentWidth);
+            Content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, m_CellSize.y + m_Padding.vertical);
         }
 
-        Vector2 offset = new Vector2(GetStartOffset(0, m_CellSize.x), GetStartOffset(1, (m_CellSize.y + m_Spacing.y) * elementCount));
         int childCount = rectChildren.Count;
 
         for (int i = 0; i < elementCount; i++)
@@ -172,11 +286,13 @@ public class BetterScrollView : LayoutGroup
 
             if (m_Direction == Direction.Horizontal)
             {
+                Vector2 offset = new Vector2(GetStartOffset(0, (m_CellSize.x+m_Spacing.x)*elementCount), GetStartOffset(1, m_CellSize.y));
                 SetChildAlongAxis(rt, 0, offset.x + (m_CellSize.x + m_Spacing.x) * i);
                 SetChildAlongAxis(rt, 1, offset.y);
             }
             else
             {
+                Vector2 offset = new Vector2(GetStartOffset(0, m_CellSize.x), GetStartOffset(1, (m_CellSize.y + m_Spacing.y) * elementCount));
                 SetChildAlongAxis(rt, 0, offset.x);
                 SetChildAlongAxis(rt, 1, offset.y + (m_CellSize.y + m_Spacing.y) * i);
             }
@@ -245,6 +361,30 @@ public class BetterScrollView : LayoutGroup
             {
                 m_Elements.RemoveLast();
                 m_Elements.AddFirst(right);
+                Vector3 newPos = right.transform.localPosition;
+                newPos.x = left.transform.localPosition.x - m_CellSize.x - m_Spacing.x;
+                right.transform.localPosition = newPos;
+                right.index = left.index - 1;
+
+                OnIndexChanged.Invoke(right.index, right.transform);
+
+                left = m_Elements.First.Value;
+                right = m_Elements.Last.Value;
+            }
+
+            while (IsElementShouldMoveRight(left.transform) && right.index < m_ObjectCount - 1)
+            {
+                m_Elements.RemoveFirst();
+                m_Elements.AddLast(left);
+                Vector3 newPos = left.transform.localPosition;
+                newPos.x = right.transform.localPosition.x + m_CellSize.x + m_Spacing.x;
+                left.transform.localPosition = newPos;
+                left.index = right.index + 1;
+
+                OnIndexChanged.Invoke(left.index, left.transform);
+
+                left = m_Elements.First.Value;
+                right = m_Elements.Last.Value;
             }
         }
     }
