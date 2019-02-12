@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
-public class BetterScrollView : LayoutGroup
+public class EndlessScrollLayout : LayoutGroup
 {
     public enum Direction
     {
@@ -32,6 +32,9 @@ public class BetterScrollView : LayoutGroup
 
     [SerializeField]
     private Direction m_Direction = Direction.Vertical;
+
+    [SerializeField]
+    private int m_LineCount = 1;
 
     [SerializeField]
     private LinkedList<Element> m_Elements;
@@ -69,7 +72,10 @@ public class BetterScrollView : LayoutGroup
             if (m_View == null)
             {
                 var scroll = GetComponentInParent<ScrollRect>();
-                m_View = scroll.viewport;
+                if (scroll != null)
+                {
+                    m_View = scroll.viewport;
+                }
             }
             return m_View;
         }
@@ -186,28 +192,30 @@ public class BetterScrollView : LayoutGroup
 
     public bool SetCurrentIndex(int index)
     {
-        if(index <0 || index >= m_ObjectCount)
+        if (index < 0 || index >= m_ObjectCount)
         {
             throw (new System.IndexOutOfRangeException());
         }
 
-        if(m_Elements == null || m_Elements.Count==0)
+        if (m_Elements == null || m_Elements.Count == 0)
         {
             return false;
         }
 
-        if(m_Direction == Direction.Horizontal)
+        int lineIndex = Mathf.FloorToInt(index / m_LineCount);
+
+        if (m_Direction == Direction.Horizontal)
         {
-            float offsetX = m_Padding.left + (m_CellSize.x + m_Spacing.x) * index;
+            float offsetX = m_Padding.left + (m_CellSize.x + m_Spacing.x) * lineIndex;
             float maxOffsetX = Content.rect.width - View.rect.width;
             offsetX = offsetX > maxOffsetX ? maxOffsetX : offsetX;
             Vector3 newPosition = Content.localPosition;
-            newPosition.x = offsetX;
+            newPosition.x = -offsetX;
             Content.localPosition = newPosition;
         }
         else
         {
-            float offsetY = m_Padding.top + (m_CellSize.y + m_Spacing.y) * index;
+            float offsetY = m_Padding.top + (m_CellSize.y + m_Spacing.y) * lineIndex;
             float maxOffsetY = Content.rect.height - View.rect.height;
             offsetY = offsetY > maxOffsetY ? maxOffsetY : offsetY;
             Vector3 newPosition = Content.localPosition;
@@ -237,11 +245,12 @@ public class BetterScrollView : LayoutGroup
         return t.TransformPoint(t.rect.min).x - View.TransformPoint(View.rect.max).x > m_CellSize.x;
     }
 
+    // 计算实现滚动，需要元素的数量
     private int CalculateElementsCount()
     {
         Vector2 viewSize = View.rect.size;
         int index_ = m_Direction == Direction.Horizontal ? 0 : 1;
-        return Mathf.CeilToInt(viewSize[index_] / m_CellSize[index_]) + 2;
+        return m_LineCount * (Mathf.CeilToInt(viewSize[index_] / m_CellSize[index_]) + 2);
     }
 
     private void CreateElements()
@@ -256,17 +265,22 @@ public class BetterScrollView : LayoutGroup
             m_Elements.Clear();
         }
 
+        // 每行/每列最大元素的数量
+        int eleCountPerLine = Mathf.FloorToInt(m_ObjectCount / m_LineCount) + 1;
+
         if (m_Direction == Direction.Vertical)
         {
-            float contentHeight = (m_CellSize.y + m_Spacing.y) * m_ObjectCount + m_Padding.vertical;
-            Content.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, m_CellSize.x + m_Padding.horizontal);
+            float contentHeight = (m_CellSize.y + m_Spacing.y) * eleCountPerLine + m_Padding.vertical;
+            float contentWidth = (m_CellSize.x + m_Spacing.x) * m_LineCount + m_Padding.horizontal;
+            Content.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, contentWidth);
             Content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
         }
         else
         {
-            float contentWidth = (m_CellSize.x + m_Spacing.x) * m_ObjectCount + m_Padding.horizontal;
+            float contentHeight = (m_CellSize.y + m_Spacing.y) * m_LineCount + m_Padding.vertical;
+            float contentWidth = (m_CellSize.x + m_Spacing.x) * eleCountPerLine + m_Padding.horizontal;
             Content.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, contentWidth);
-            Content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, m_CellSize.y + m_Padding.vertical);
+            Content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
         }
 
         int childCount = rectChildren.Count;
@@ -284,17 +298,23 @@ public class BetterScrollView : LayoutGroup
                 rt = g.transform as RectTransform;
             }
 
+            // 沿着指定方向的索引数（水平-列索引、垂直-行索引）
+            int r = Mathf.FloorToInt((float)i / m_LineCount);
+
+            // 行内索引(水平-行索引、垂直-列索引)
+            int c = i % m_LineCount;
+
             if (m_Direction == Direction.Horizontal)
             {
-                Vector2 offset = new Vector2(GetStartOffset(0, (m_CellSize.x+m_Spacing.x)*elementCount), GetStartOffset(1, m_CellSize.y));
-                SetChildAlongAxis(rt, 0, offset.x + (m_CellSize.x + m_Spacing.x) * i);
-                SetChildAlongAxis(rt, 1, offset.y);
+                Vector2 offset = new Vector2(GetStartOffset(0, (m_CellSize.x + m_Spacing.x) * eleCountPerLine), GetStartOffset(1, m_CellSize.y));
+                SetChildAlongAxis(rt, 0, offset.x + (m_CellSize.x + m_Spacing.x) * r);
+                SetChildAlongAxis(rt, 1, offset.y + (m_CellSize.y + m_Spacing.y) * c);
             }
             else
             {
-                Vector2 offset = new Vector2(GetStartOffset(0, m_CellSize.x), GetStartOffset(1, (m_CellSize.y + m_Spacing.y) * elementCount));
-                SetChildAlongAxis(rt, 0, offset.x);
-                SetChildAlongAxis(rt, 1, offset.y + (m_CellSize.y + m_Spacing.y) * i);
+                Vector2 offset = new Vector2(GetStartOffset(0, m_CellSize.x), GetStartOffset(1, (m_CellSize.y + m_Spacing.y) * eleCountPerLine));
+                SetChildAlongAxis(rt, 0, offset.x + (m_CellSize.x + m_Spacing.x) * c);
+                SetChildAlongAxis(rt, 1, offset.y + (m_CellSize.y + m_Spacing.y) * r);
             }
 
             m_Elements.AddLast(new Element()
@@ -329,7 +349,19 @@ public class BetterScrollView : LayoutGroup
                 m_Elements.RemoveLast();
                 m_Elements.AddFirst(bottom);
                 Vector3 newPos = bottom.transform.localPosition;
-                newPos.y = top.transform.localPosition.y + m_CellSize.y + m_Spacing.y;
+                if (top.index % m_LineCount == 0)
+                {
+                    // 不在同一行:top在第一列，bottom的位置则应该是上一行的最后一个位置
+                    newPos.x = top.transform.localPosition.x + (m_LineCount - 1) * (m_CellSize.y + m_Spacing.y);
+                    newPos.y = top.transform.localPosition.y + m_CellSize.y + m_Spacing.y;
+                }
+                else
+                {
+                    // 在同一行:bottom位于top的左侧
+                    newPos.x = top.transform.localPosition.x - (m_CellSize.x + m_Spacing.x);
+                    newPos.y = top.transform.localPosition.y;
+                }
+
                 bottom.transform.localPosition = newPos;
                 bottom.index = top.index - 1;
                 OnIndexChanged.Invoke(bottom.index, bottom.transform);
@@ -343,7 +375,18 @@ public class BetterScrollView : LayoutGroup
                 m_Elements.RemoveFirst();
                 m_Elements.AddLast(top);
                 Vector3 newPos = top.transform.localPosition;
-                newPos.y = bottom.transform.localPosition.y - m_CellSize.y - m_Spacing.y;
+                if (bottom.index % m_LineCount == (m_LineCount - 1))
+                {
+                    // 不在同一行:bottom位于最后一列，则top位置应该是下一行的第一列
+                    newPos.x = bottom.transform.localPosition.x - (m_LineCount - 1) * (m_CellSize.x + m_Spacing.x);
+                    newPos.y = bottom.transform.localPosition.y - (m_CellSize.y + m_Spacing.y);
+                }
+                else
+                {
+                    // 在同一行:top位于bottom右侧
+                    newPos.x = bottom.transform.localPosition.x + (m_CellSize.x + m_Spacing.x);
+                    newPos.y = bottom.transform.localPosition.y;
+                }
                 top.transform.localPosition = newPos;
                 top.index = bottom.index + 1;
                 OnIndexChanged.Invoke(top.index, top.transform);
@@ -362,7 +405,18 @@ public class BetterScrollView : LayoutGroup
                 m_Elements.RemoveLast();
                 m_Elements.AddFirst(right);
                 Vector3 newPos = right.transform.localPosition;
-                newPos.x = left.transform.localPosition.x - m_CellSize.x - m_Spacing.x;
+                if (left.index % m_LineCount == 0)
+                {
+                    // 不在同一列:left位于第一行，则right位置应该是上一列的最后一行
+                    newPos.x = left.transform.localPosition.x - (m_CellSize.x + m_Spacing.x);
+                    newPos.y = left.transform.localPosition.y - (m_LineCount - 1) * (m_CellSize.y + m_Spacing.y);
+                }
+                else
+                {
+                    // 在同一列:right位于left的上方
+                    newPos.x = left.transform.localPosition.x;
+                    newPos.y = left.transform.localPosition.y + (m_CellSize.y + m_Spacing.y);
+                }
                 right.transform.localPosition = newPos;
                 right.index = left.index - 1;
 
@@ -377,7 +431,18 @@ public class BetterScrollView : LayoutGroup
                 m_Elements.RemoveFirst();
                 m_Elements.AddLast(left);
                 Vector3 newPos = left.transform.localPosition;
-                newPos.x = right.transform.localPosition.x + m_CellSize.x + m_Spacing.x;
+                if (right.index % m_LineCount == (m_LineCount - 1))
+                {
+                    // 不在同一列:right位于最后一行，则left应该位于下一列的第一行
+                    newPos.x = right.transform.localPosition.x + m_CellSize.x + m_Spacing.x;
+                    newPos.y = right.transform.localPosition.y + (m_LineCount - 1) * (m_CellSize.y + m_Spacing.y);
+                }
+                else
+                {
+                    // 在同一列：left位于right的下方
+                    newPos.x = right.transform.localPosition.x;
+                    newPos.y = right.transform.localPosition.y - (m_CellSize.y + m_Spacing.y);
+                }
                 left.transform.localPosition = newPos;
                 left.index = right.index + 1;
 

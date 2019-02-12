@@ -15,7 +15,7 @@ public class NewBehaviourScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        index = GetComponent<BetterScrollView>().index;
+        index = GetComponent<EndlessScrollLayout>().index;
     }
 
     public void OnIndexChanged(int index, RectTransform transform)
@@ -27,7 +27,7 @@ public class NewBehaviourScript : MonoBehaviour
     [ContextMenu("SetIndex")]
     public void SetIndexRand()
     {
-        BetterScrollView bsv = GetComponent<BetterScrollView>();
+        EndlessScrollLayout bsv = GetComponent<EndlessScrollLayout>();
         int index = Random.Range(0, bsv.ObjectCount-1);
         Debug.Log(index);
         bsv.index = index;
@@ -36,7 +36,7 @@ public class NewBehaviourScript : MonoBehaviour
     [ContextMenu("SetMaxIndex")]
     public void SetMaxIndex()
     {
-        BetterScrollView bsv = GetComponent<BetterScrollView>();
+        EndlessScrollLayout bsv = GetComponent<EndlessScrollLayout>();
         bsv.index = bsv.ObjectCount - 1;
     }
 }
