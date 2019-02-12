@@ -256,17 +256,10 @@ public class EndlessScrollLayout : LayoutGroup
     private void CreateElements()
     {
         int elementCount = CalculateElementsCount();
-        if (m_Elements == null)
-        {
-            m_Elements = new LinkedList<Element>();
-        }
-        else
-        {
-            m_Elements.Clear();
-        }
+        m_Elements = new LinkedList<Element>();
 
         // 每行/每列最大元素的数量
-        int eleCountPerLine = Mathf.FloorToInt(m_ObjectCount / m_LineCount) + 1;
+        int eleCountPerLine = Mathf.CeilToInt((float)m_ObjectCount / m_LineCount);
 
         if (m_Direction == Direction.Vertical)
         {
@@ -292,10 +285,15 @@ public class EndlessScrollLayout : LayoutGroup
             {
                 rt = this.rectTransform.GetChild(i) as RectTransform;
             }
-            else
+            else if (m_ElementPrefab != null)
             {
                 GameObject g = Instantiate(m_ElementPrefab, Content);
                 rt = g.transform as RectTransform;
+            }
+
+            if (rt == null)
+            {
+                return;
             }
 
             // 沿着指定方向的索引数（水平-列索引、垂直-行索引）
