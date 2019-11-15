@@ -99,7 +99,11 @@ public class EndlessScrollLayout : LayoutGroup
         }
         set
         {
-            m_ObjectCount = value;
+            if (m_ObjectCount != value)
+            {
+                m_ObjectCount = value;
+                CalculateLayoutInputHorizontal();
+            }
         }
     }
 
@@ -262,7 +266,7 @@ public class EndlessScrollLayout : LayoutGroup
 
     private void CreateElements()
     {
-        int elementCount =  Mathf.Min(m_ObjectCount,CalculateElementsCount());
+        int elementCount = Mathf.Min(m_ObjectCount, CalculateElementsCount());
         m_Elements = new LinkedList<Element>();
 
         // 每行/每列最大元素的数量
@@ -333,7 +337,7 @@ public class EndlessScrollLayout : LayoutGroup
         // 滞后删除，在 Rebuild 阶段不允许删除对象
         for (int i = elementCount; i < childCount; i++)
         {
-            RectTransform child = rectTransform.GetChild(i)as RectTransform;
+            RectTransform child = rectTransform.GetChild(i) as RectTransform;
             if (child == null) continue;
             m_NeedToRemove.Add(child.gameObject);
         }
